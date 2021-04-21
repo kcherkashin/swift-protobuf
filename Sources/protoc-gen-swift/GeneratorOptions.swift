@@ -11,6 +11,7 @@
 import SwiftProtobufPluginLibrary
 
 class GeneratorOptions {
+
   enum OutputNaming : String {
     case FullPath
     case PathToUnderscores
@@ -22,12 +23,22 @@ class GeneratorOptions {
     case Public
   }
   
-  enum MessageRuntimeConformance: String, CaseIterable {
-    case Message, MessageImplementationBase, ProtoNameProviding
+  enum MessageConformance: String, CaseIterable {
+    case DecodableMessage
   }
   
   enum BooleanParameter: String {
     case Yes, No
+    
+    var boolen: Bool {
+      switch self {
+        case .No:
+          return false
+        case .Yes:
+          return true
+      }
+    }
+
   }
   
   let outputNaming: OutputNaming
@@ -37,18 +48,20 @@ class GeneratorOptions {
   /// A string snippet to insert for the visibility
   let visibilitySourceSnippet: String
   
-  let messageRuntimeConformances: [MessageRuntimeConformance]
+  let messageConformances: [MessageConformance]
   
-  let commentsReduced: BooleanParameter
+  let commentsReduced: Bool
   
+  let swiftLintDisabled: Bool
   
   init(parameter: String?) throws {
     var outputNaming: OutputNaming = .FullPath
     var moduleMapPath: String?
     var visibility: Visibility = .Internal
     var swiftProtobufModuleName: String? = nil
-    var messageRuntimeConformances = MessageRuntimeConformance.allCases
+    var messageConformances = MessageConformance.allCases
     var commentsReduced: BooleanParameter = .No
+    var swiftLintDisabled: BooleanParameter = .No
     
     for pair in parseParameter(string:parameter) {
       switch pair.key {
@@ -79,11 +92,11 @@ class GeneratorOptions {
             throw GenerationError.invalidParameterValue(name: pair.key,
                                                         value: pair.value)
           }
-        case "MessageRuntimeConformances":
-          messageRuntimeConformances = []
+        case "MessageConformances":
+          messageConformances = []
           for element in pair.value.components(separatedBy: "+").filter({ !$0.isEmpty }) {
-            if let conformance = MessageRuntimeConformance(rawValue: element.trimmingCharacters(in: .whitespacesAndNewlines)) {
-              messageRuntimeConformances.append(conformance)
+            if let conformance = MessageConformance(rawValue: element.trimmingCharacters(in: .whitespacesAndNewlines)) {
+              messageConformances.append(conformance)
             } else {
               throw GenerationError.invalidParameterValue(name: pair.key,
                                                           value: element)
@@ -92,6 +105,13 @@ class GeneratorOptions {
         case "ReduceComments":
           if let value = BooleanParameter(rawValue: pair.value) {
             commentsReduced = value
+          } else {
+            throw GenerationError.invalidParameterValue(name: pair.key,
+                                                        value: pair.value)
+          }
+        case "SwiftLintDisabled":
+          if let value = BooleanParameter(rawValue: pair.value) {
+            swiftLintDisabled = value
           } else {
             throw GenerationError.invalidParameterValue(name: pair.key,
                                                         value: pair.value)
@@ -115,8 +135,9 @@ class GeneratorOptions {
     
     self.outputNaming = outputNaming
     self.visibility = visibility
-    self.messageRuntimeConformances = messageRuntimeConformances
-    self.commentsReduced = commentsReduced
+    self.messageConformances = messageConformances
+    self.commentsReduced = commentsReduced.boolen
+    self.swiftLintDisabled = swiftLintDisabled.boolen
     
     switch visibility {
       case .Internal:
