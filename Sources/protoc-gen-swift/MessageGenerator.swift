@@ -232,10 +232,10 @@ class MessageGenerator {
     }
     p.print("\n")
 
-    generateTraverse(printer: &p)
+    generateTraverse(printer: &p, reducedIfPossible: !runtimeConformances.contains(.EncodableMessage))
     p.print("\n")
 
-    generateMessageEquality(printer: &p)
+    generateMessageEquality(printer: &p, reducedIfPossible: !runtimeConformances.contains(.EquatableMessage))
     p.print("\n")
 
     p.outdent()
@@ -341,7 +341,7 @@ class MessageGenerator {
   /// Generates the `traverse` method for the message.
   ///
   /// - Parameter p: The code printer.
-  private func generateTraverse(printer p: inout CodePrinter) {
+  private func generateTraverse(printer p: inout CodePrinter, reducedIfPossible: Bool) {
     p.print("\(visibility)func traverse<V: \(namer.swiftProtobufModuleName).Visitor>(visitor: inout V) throws {\n")
     p.indent()
     generateWithLifetimeExtension(printer: &p, throws: true) { p in
@@ -354,13 +354,22 @@ class MessageGenerator {
 
       var ranges = descriptor.normalizedExtensionRanges.makeIterator()
       var nextRange = ranges.next()
-      for f in fieldsSortedByNumber {
+
+      var fieldsToVisit = fieldsSortedByNumber
+
+      if reducedIfPossible, let idField = fieldsSortedByNumber.first(where: { $0.underscoreSwiftName == "id" || $0.underscoreSwiftName == "_id" }) {
+        fieldsToVisit = [idField]
+      }
+
+      for f in fieldsToVisit {
         while nextRange != nil && Int(nextRange!.start) < f.number {
           p.print("try visitor.\(visitExtensionsName)(fields: _protobuf_extensionFieldValues, start: \(nextRange!.start), end: \(nextRange!.end))\n")
           nextRange = ranges.next()
         }
         f.generateTraverse(printer: &p)
       }
+
+
       while nextRange != nil {
         p.print("try visitor.\(visitExtensionsName)(fields: _protobuf_extensionFieldValues, start: \(nextRange!.start), end: \(nextRange!.end))\n")
         nextRange = ranges.next()
@@ -371,7 +380,7 @@ class MessageGenerator {
     p.print("}\n")
   }
 
-  private func generateMessageEquality(printer p: inout CodePrinter) {
+  private func generateMessageEquality(printer p: inout CodePrinter, reducedIfPossible: Bool) {
     p.print("\(visibility)static func ==(lhs: \(swiftFullName), rhs: \(swiftFullName)) -> Bool {\n")
     p.indent()
     var compareFields = true
@@ -388,9 +397,14 @@ class MessageGenerator {
       generateWithLifetimeExtension(printer: &p,
                                     alsoCapturing: "rhs",
                                     selfQualifier: "lhs") { p in
-        for f in fields {
-          f.generateFieldComparison(printer: &p)
+        if reducedIfPossible, let idField = fields.first(where: { $0.underscoreSwiftName == "id" || $0.underscoreSwiftName == "_id" }) {
+          idField.generateFieldComparison(printer: &p)
+        } else {
+          for f in fields {
+            f.generateFieldComparison(printer: &p)
+          }
         }
+
         if storage != nil {
           p.print("return true\n")
         }

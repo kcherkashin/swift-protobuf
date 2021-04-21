@@ -24,7 +24,7 @@ class GeneratorOptions {
   }
   
   enum MessageConformance: String, CaseIterable {
-    case DecodableMessage
+    case DecodableMessage, EncodableMessage, EquatableMessage
   }
   
   enum BooleanParameter: String {

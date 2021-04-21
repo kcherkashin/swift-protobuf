@@ -22,6 +22,8 @@ import SwiftProtobuf
 protocol FieldGenerator {
   var number: Int { get }
 
+  var underscoreSwiftName: String { get }
+
   /// Name mapping entry for the field.
   var fieldMapNames: String { get }
 

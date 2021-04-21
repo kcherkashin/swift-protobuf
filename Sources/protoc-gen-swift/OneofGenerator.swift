@@ -24,6 +24,7 @@ class OneofGenerator {
         private(set) var group: Int
 
         let swiftName: String
+        let underscoreSwiftName: String
         let dottedSwiftName: String
         let swiftType: String
         let swiftDefaultValue: String
@@ -54,6 +55,7 @@ class OneofGenerator {
                                                    includeHasAndClear: false)
             swiftName = names.name
             dottedSwiftName = names.prefixed
+            underscoreSwiftName = names.prefixed
             swiftType = descriptor.swiftType(namer: namer)
             swiftDefaultValue = descriptor.swiftDefaultValue(namer: namer)
             protoGenericType = descriptor.protoGenericType

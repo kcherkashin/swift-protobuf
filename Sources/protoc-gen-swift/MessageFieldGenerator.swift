@@ -24,7 +24,7 @@ class MessageFieldGenerator: FieldGeneratorBase, FieldGenerator {
 
     private let hasFieldPresence: Bool
     private let swiftName: String
-    private let underscoreSwiftName: String
+    let underscoreSwiftName: String
     private let storedProperty: String
     private let swiftHasName: String
     private let swiftClearName: String
