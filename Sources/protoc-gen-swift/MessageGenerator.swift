@@ -32,6 +32,8 @@ class MessageGenerator {
   private let enums: [EnumGenerator]
   private let messages: [MessageGenerator]
   private let isExtensible: Bool
+  private let runtimeConformances: [GeneratorOptions.MessageConformance]
+  private let isCommentsReduced: Bool
 
   init(
     descriptor: Descriptor,
@@ -47,6 +49,9 @@ class MessageGenerator {
     isExtensible = !descriptor.extensionRanges.isEmpty
     swiftRelativeName = namer.relativeName(message: descriptor)
     swiftFullName = namer.fullName(message: descriptor)
+
+    runtimeConformances = generatorOptions.messageConformances
+    isCommentsReduced = generatorOptions.commentsReduced
 
     let useHeapStorage =
       MessageStorageDecision.shouldUseHeapStorage(descriptor: descriptor)
@@ -120,21 +125,23 @@ class MessageGenerator {
       conformances = ""
     }
     p.print(
-        "\n",
-        descriptor.protoSourceComments(),
-        "\(visibility)struct \(swiftRelativeName)\(conformances) {\n")
+      "\n",
+      descriptor.protoSourceComments(),
+      "\(visibility)struct \(swiftRelativeName)\(conformances) {\n")
     p.indent()
-    p.print("// \(namer.swiftProtobufModuleName).Message conformance is added in an extension below. See the\n",
-            "// `Message` and `Message+*Additions` files in the SwiftProtobuf library for\n",
-            "// methods supported on all messages.\n")
+    if !isCommentsReduced {
+      p.print("// \(namer.swiftProtobufModuleName).Message conformance is added in an extension below. See the\n",
+              "// `Message` and `Message+*Additions` files in the SwiftProtobuf library for\n",
+              "// methods supported on all messages.\n")
+    }
 
     for f in fields {
       f.generateInterface(printer: &p)
     }
 
     p.print(
-        "\n",
-        "\(visibility)var unknownFields = \(namer.swiftProtobufModuleName).UnknownStorage()\n")
+      "\n",
+      "\(visibility)var unknownFields = \(namer.swiftProtobufModuleName).UnknownStorage()\n")
 
     for o in oneofs {
       o.generateMainEnum(printer: &p)
@@ -154,14 +161,14 @@ class MessageGenerator {
     // generate it along with others that can take public proprerties. When it
     // generates the others doesn't seem to be documented.
     p.print(
-        "\n",
-        "\(visibility)init() {}\n")
+      "\n",
+      "\(visibility)init() {}\n")
 
     // Optional extension support
     if isExtensible {
       p.print(
-          "\n",
-          "\(visibility)var _protobuf_extensionFieldValues = \(namer.swiftProtobufModuleName).ExtensionFieldValueSet()\n")
+        "\n",
+        "\(visibility)var _protobuf_extensionFieldValues = \(namer.swiftProtobufModuleName).ExtensionFieldValueSet()\n")
     }
     if let storage = storage {
       if !isExtensible {
@@ -195,9 +202,10 @@ class MessageGenerator {
   }
 
   func generateRuntimeSupport(printer p: inout CodePrinter, file: FileGenerator, parent: MessageGenerator?) {
+
     p.print(
-        "\n",
-        "extension \(swiftFullName): \(namer.swiftProtobufModuleName).Message, \(namer.swiftProtobufModuleName)._MessageImplementationBase, \(namer.swiftProtobufModuleName)._ProtoNameProviding {\n")
+      "\n",
+      "extension \(swiftFullName): \(namer.swiftProtobufModuleName).Message, \(namer.swiftProtobufModuleName)._MessageImplementationBase, \(namer.swiftProtobufModuleName)._ProtoNameProviding {\n")
     p.indent()
 
     if let parent = parent {
@@ -216,12 +224,20 @@ class MessageGenerator {
     }
     p.print("\n")
     generateIsInitialized(printer:&p)
-    // generateIsInitialized provides a blank line after itself.
-    generateDecodeMessage(printer: &p)
+
+    if runtimeConformances.contains(.DecodableMessage) {
+      generateDecodeMessage(printer: &p)
+    } else {
+      decodeMessagePlaceholder(printer: &p)
+    }
     p.print("\n")
+
     generateTraverse(printer: &p)
     p.print("\n")
+
     generateMessageEquality(printer: &p)
+    p.print("\n")
+
     p.outdent()
     p.print("}\n")
 
@@ -248,6 +264,11 @@ class MessageGenerator {
     }
   }
 
+  private func decodeMessagePlaceholder(printer p: inout CodePrinter) {
+    p.print("\(visibility)mutating func decodeMessage<D: \(namer.swiftProtobufModuleName).Decoder>(decoder: inout D) throws {\n")
+    p.print("   return\n")
+    p.print("}\n")
+  }
 
   /// Generates the `decodeMessage` method for the message.
   ///
@@ -282,10 +303,10 @@ class MessageGenerator {
         if !fields.isEmpty {
 
           p.print(
-              "// The use of inline closures is to circumvent an issue where the compiler\n",
-              "// allocates stack space for every case branch when no optimizations are\n",
-              "// enabled. https://github.com/apple/swift-protobuf/issues/1034\n",
-              "switch fieldNumber {\n")
+            "// The use of inline closures is to circumvent an issue where the compiler\n",
+            "// allocates stack space for every case branch when no optimizations are\n",
+            "// enabled. https://github.com/apple/swift-protobuf/issues/1034\n",
+            "switch fieldNumber {\n")
           for f in fieldsSortedByNumber {
             f.generateDecodeFieldCase(printer: &p)
           }
@@ -423,7 +444,7 @@ class MessageGenerator {
     }
 
     p.print(
-        "public var isInitialized: Bool {\n")
+      "public var isInitialized: Bool {\n")
     p.indent()
     if isExtensible {
       p.print("if !_protobuf_extensionFieldValues.isInitialized {return false}\n")

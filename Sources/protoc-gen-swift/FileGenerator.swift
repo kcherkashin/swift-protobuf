@@ -66,6 +66,13 @@ class FileGenerator {
             "// For information on using the generated types, please see the documentation:\n",
             "//   https://github.com/apple/swift-protobuf/\n",
             "\n")
+      
+      if generatorOptions.swiftLintDisabled {
+        p.print("// Disabling swiftlint rules for the whole file:\n")
+        p.print("//swiftlint:disable all\n")
+        p.print("\n")
+      }
+      
 
         // Attempt to bring over the comments at the top of the .proto file as
         // they likely contain copyrights/preamble/etc.
@@ -180,6 +187,11 @@ class FileGenerator {
                 m.generateRuntimeSupport(printer: &p, file: self, parent: nil)
             }
         }
+      
+      if generatorOptions.swiftLintDisabled {
+        p.print("// Enabling swiftlint rules back:\n")
+        p.print("//swiftlint:enable all\n")
+      }
     }
 
     private func generateVersionCheck(printer p: inout CodePrinter) {
